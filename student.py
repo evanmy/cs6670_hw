@@ -1,7 +1,8 @@
 def compute_mini_sift_desc(img, kp_locs, orientation_norm=False,
                            patch_size=32, num_spatial_bins=4, num_ori_bins=8):
     
-    """ Compute the mini-SIFT descriptor described in the homework write-up
+    """ 
+    Compute the mini-SIFT descriptor described in the homework write-up
         NOTE : Orientation normalization is computed in image patch.
         HINT : `utils.crop_patch` and `utils.compute_histogram` will be useful.
     Args:
