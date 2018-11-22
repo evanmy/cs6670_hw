@@ -15,11 +15,39 @@ class Discriminator(nn.Module):
 
     def __init__(self, args):
         super(Discriminator, self).__init__()
-        raise NotImplementedError()
+        self.lrelu = nn.LeakyReLU(0.2)
+        self.conv1 = nn.Conv2d(args.nc, args.ndf, 
+                               kernel_size=4, stride=2, padding=1, 
+                               bias=False)
 
+        self.conv2 = nn.Conv2d(args.ndf, args.ndf*2, 
+                               kernel_size=4, stride=2, padding=1, 
+                               bias=False)    
+        
+        self.bn2 = nn.BatchNorm2d(args.ngf*2) 
+        self.conv3 = nn.Conv2d(args.ndf*2, args.ndf*4, 
+                               kernel_size=4, stride=2, padding=1, 
+                               bias=False)    
+        self.bn3 = nn.BatchNorm2d(args.ngf*4) 
+        
+        self.conv4 = nn.Conv2d(args.ndf*4, 1, 
+                               kernel_size=4, stride=1, padding=0, 
+                               bias=False)   
 
     def forward(self, x):
-        raise NotImplementedError()
+        
+        x = self.conv1(x)
+        x = self.lrelu(x)
+        
+        x = self.bn2(self.conv2(x))
+        x = self.lrelu(x)
+        
+        x = self.bn3(self.conv3(x))
+        x = self.lrelu(x)
+        
+        x = conv4(x)
+        
+        return F.sigmoid(x)
 
 
     def load_model(self, filename):
@@ -39,12 +67,40 @@ class Generator(nn.Module):
 
     def __init__(self, args):
         super(Generator, self).__init__()
-        raise NotImplementedError()
-
+        self.relu = nn.ReLU()
+        
+        self.proj = nn.Linear(args.nz, args.ngf*4*4*4)
+        self.bn0 = nn.BatchNorm1d(args.ngf*4*4*4)
+        
+        self.dconv1 = nn.ConvTranspose2d(args.ngf*4, args.ngf*2, 
+                                         kernel_size=4, padding=1, stride=2, 
+                                         bias=False)
+        
+        self.bn1 = nn.BatchNorm2d(args.ngf*2) 
+        
+        self.dconv2 = nn.ConvTranspose2d(args.ngf*2, args.ngf, 
+                                         kernel_size=4, padding=1, stride=2, 
+                                         bias=False)
+        self.bn2 = nn.BatchNorm2d(args.ngf) 
+        
+        self.dconv3 = nn.ConvTranspose2d(args.ngf, args.nc, 
+                                         kernel_size= 4, padding=1, stride=2, 
+                                         bias=False)        
 
     def forward(self, z, c=None):
-        raise NotImplementedError()
-
+        x = self.proj(z)
+        x = self.bn0(x)
+        
+        x = x.view(x.size(0), 4*args.ngf, 4, 4)
+        x = self.bn1(self.dconv1(x))
+        x = self.relu(x)
+        
+        x = self.bn2(self.dconv2(x))
+        x = self.relu(x)
+        
+        x = F.tanh(self.dconv3(x))
+        
+        return x
 
     def load_model(self, filename):
         """ Load the pretrained weights stored in file [filename] into the model.
@@ -69,8 +125,18 @@ def d_loss(dreal, dfake):
     Rets:
         DCGAN loss for Discriminator.
     """
-    raise NotImplementedError()
-
+    
+    real_target = torch.ones(dreal.shape[0]).float()
+    fake_target = torch.zeros(dfake.shape[0]).float()
+    
+    if real_target.is_cuda:
+        real_target = real_target.cuda()
+        fake_target = fake_target.cuda()
+    
+    pred = torch.cat([dreal, dfake])
+    target = torch.cat((real_target, fake_target))
+    
+    return F.binary_cross_entropy(pred, target)
 
 def g_loss(dreal, dfake):
     """
@@ -82,8 +148,17 @@ def g_loss(dreal, dfake):
     Rets:
         DCGAN loss for Generator.
     """
-    raise NotImplementedError()
-
+    real_target = torch.ones(dreal.shape[0]).float()
+    fool_target = torch.ones(dfake.shape[0]).float()
+    
+    if real_target.is_cuda:
+        real_target = real_target.cuda()
+        fool_target = fool_target.cuda()
+    
+    pred = torch.cat([dreal, dfake])
+    target = torch.cat((real_target, fool_target))
+    
+    return F.binary_cross_entropy(pred, target)
 
 def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=None):
     """Train the GAN for one batch iteration.
@@ -100,8 +175,33 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
         [L_d]   (float) Discriminator loss (before discriminator's update step).
         [L_g]   (float) Generator loss (before generator's update step)
     """
-    raise NotImplementedError()
+    g_opt.zero_grad()
+    d_opt.zero_grad()
+    inputs, labels = input_data
 
+    '''Gen'''
+    z = get_z()
+    fake = g_net(z)
+    dfake = d_net(fake)
+    dreal = d_net(inputs)
+    L_g = g_loss(dreal.detach(), dfake)
+    L_g.backward()
+    g_opt.step()
+    
+    '''Dis'''
+    g_opt.zero_grad()
+    d_opt.zero_grad()
+    
+    z = get_z()
+    fake = g_net(z)
+    dfake = d_net(fake.detach())
+    dreal = d_net(inputs)
+    L_d = d_loss(dreal, dfake)
+    L_d.backward()
+    d_opt.step()
+    
+    return L_d, L_g
+    
 
 def sample(model, n, sampler, args):
     """ Sample [n] images from [model] using noise created by the sampler.
@@ -112,7 +212,13 @@ def sample(model, n, sampler, args):
     Rets:
         [imgs]      (B, C, W, H) Float, numpy array.
     """
-    raise NotImplementedError()
+    s = []
+    for i in range(n):
+        z = sampler
+        out = model(z)
+        s += [out]
+        
+    raise torch.cat(s,0)
 
 
 ############################################################
