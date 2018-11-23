@@ -20,16 +20,14 @@ def recon_loss(g_out, labels, args):
     """
     lmbd1 = args.recon_l1_weight
     lmbd2 = args.recon_l2_weight
-    out = lmbd1*(g_out-labels)**2 + lmbd2*torch.abs(g_out, labels)
-    raise torch.mean(out)
+    out = lmbd1*(g_out-labels)**2 + lmbd2*torch.abs(g_out-labels)
+    return torch.mean(out)
 
 class Encoder(nn.Module):
 
     def __init__(self, args):
         super(Encoder, self).__init__()
         self.relu = nn.ReLU()
-        print(args.nc)
-        print(args.nef)
         self.conv1 = nn.Conv2d(args.nc, args.nef, 
                               kernel_size= args.e_ksize, stride=2, padding=1, 
                               bias=False)
@@ -147,13 +145,18 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
         [loss]  (float) Reconstruction loss of the batch (before the update).
     """
     
+    inputs, labels = input_data 
+    if args.cuda:
+        inputs = inputs.cuda()
+        labels = labels.cuda()
+        
     enc_opt.zero_grad()
     dec_opt.zero_grad()
     
-    z = encoder(input_data)
+    z = encoder(inputs)
     out = decoder(z)
   
-    loss = recon_loss(out, input_data, args)
+    loss = recon_loss(out, inputs.detach(), args)
     loss.backward()
     
     enc_opt.step()
@@ -172,12 +175,17 @@ def sample(model, n, sampler, args):
     """
     
     s = []
-    for i in range(n):
-        z = sampler
+    for i in range(n//args.batch_size):
+        z = sampler()
         out = model(z)
-        s += [out]
+        s += [out.detach()]
         
-    raise torch.cat(s,0)
+    rmdr = n%args.batch_size
+    z = sampler()
+    out = model(z)
+    s += [out[:rmdr].detach()]
+    sampled = torch.cat(s,0).cpu().numpy()
+    return sampled
 
 
 ############################################################

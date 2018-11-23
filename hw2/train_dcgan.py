@@ -24,11 +24,11 @@ class Discriminator(nn.Module):
                                kernel_size=4, stride=2, padding=1, 
                                bias=False)    
         
-        self.bn2 = nn.BatchNorm2d(args.ngf*2) 
+        self.bn2 = nn.BatchNorm2d(args.ndf*2) 
         self.conv3 = nn.Conv2d(args.ndf*2, args.ndf*4, 
                                kernel_size=4, stride=2, padding=1, 
                                bias=False)    
-        self.bn3 = nn.BatchNorm2d(args.ngf*4) 
+        self.bn3 = nn.BatchNorm2d(args.ndf*4) 
         
         self.conv4 = nn.Conv2d(args.ndf*4, 1, 
                                kernel_size=4, stride=1, padding=0, 
@@ -45,7 +45,7 @@ class Discriminator(nn.Module):
         x = self.bn3(self.conv3(x))
         x = self.lrelu(x)
         
-        x = conv4(x)
+        x = self.conv4(x)
         
         return F.sigmoid(x)
 
@@ -129,12 +129,12 @@ def d_loss(dreal, dfake):
     real_target = torch.ones(dreal.shape[0]).float()
     fake_target = torch.zeros(dfake.shape[0]).float()
     
-    if real_target.is_cuda:
+    if dreal.is_cuda or dfake.is_cuda():
         real_target = real_target.cuda()
         fake_target = fake_target.cuda()
     
-    pred = torch.cat([dreal, dfake])
-    target = torch.cat((real_target, fake_target))
+    pred = torch.cat([dreal, dfake]).squeeze()
+    target = torch.cat((real_target, fake_target)).squeeze()
     
     return F.binary_cross_entropy(pred, target)
 
@@ -151,12 +151,12 @@ def g_loss(dreal, dfake):
     real_target = torch.ones(dreal.shape[0]).float()
     fool_target = torch.ones(dfake.shape[0]).float()
     
-    if real_target.is_cuda:
+    if dreal.is_cuda or dfake.is_cuda():
         real_target = real_target.cuda()
         fool_target = fool_target.cuda()
     
-    pred = torch.cat([dreal, dfake])
-    target = torch.cat((real_target, fool_target))
+    pred = torch.cat([dreal, dfake]).squeeze()
+    target = torch.cat((real_target, fool_target)).squeeze()
     
     return F.binary_cross_entropy(pred, target)
 
@@ -178,7 +178,10 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     g_opt.zero_grad()
     d_opt.zero_grad()
     inputs, labels = input_data
-
+    if args.cuda:
+        inputs = inputs.cuda()
+        labels = labels.cuda()
+        
     '''Gen'''
     z = get_z()
     fake = g_net(z)
@@ -212,13 +215,19 @@ def sample(model, n, sampler, args):
     Rets:
         [imgs]      (B, C, W, H) Float, numpy array.
     """
+    
     s = []
-    for i in range(n):
-        z = sampler
+    for i in range(n//args.batch_size):
+        z = sampler()
         out = model(z)
-        s += [out]
+        s += [out.detach()]
         
-    raise torch.cat(s,0)
+    rmdr = n%args.batch_size
+    z = sampler()
+    out = model(z)
+    s += [out[:rmdr].detach()]
+    sampled = torch.cat(s,0).cpu().numpy()
+    return sampled
 
 
 ############################################################
