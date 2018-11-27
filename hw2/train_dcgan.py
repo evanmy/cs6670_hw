@@ -15,6 +15,8 @@ class Discriminator(nn.Module):
 
     def __init__(self, args):
         super(Discriminator, self).__init__()
+        self.args = args
+        
         self.lrelu = nn.LeakyReLU(0.2)
         self.conv1 = nn.Conv2d(args.nc, args.ndf, 
                                kernel_size=4, stride=2, padding=1, 
@@ -60,14 +62,16 @@ class Discriminator(nn.Module):
             net.load_model('dcgan.pth.tar')
             # Here [net] should be loaded with weights from file 'dcgan.pth.tar'
         """
-        raise NotImplementedError()
-
+        summary = torch.load(filename)
+        discriminator = Discriminator(self.args)
+        discriminator.load_state_dict(summary['dnet'])
 
 class Generator(nn.Module):
 
     def __init__(self, args):
         super(Generator, self).__init__()
         self.relu = nn.ReLU()
+        self.args = args 
         
         self.proj = nn.Linear(args.nz, args.ngf*4*4*4)
         self.bn0 = nn.BatchNorm1d(args.ngf*4*4*4)
@@ -112,8 +116,9 @@ class Generator(nn.Module):
             net.load_model('dcgan.pth.tar')
             # Here [net] should be loaded with weights from file 'dcgan.pth.tar'
         """
-        raise NotImplementedError()
-
+        summary = torch.load(filename)
+        gen = Generator(self.args)
+        gen.load_state_dict(summary['gnet'])        
 
 def d_loss(dreal, dfake):
     """

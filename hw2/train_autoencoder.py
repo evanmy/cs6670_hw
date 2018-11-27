@@ -27,6 +27,8 @@ class Encoder(nn.Module):
 
     def __init__(self, args):
         super(Encoder, self).__init__()
+        self.args = args 
+    
         self.relu = nn.ReLU()
         self.conv1 = nn.Conv2d(args.nc, args.nef, 
                               kernel_size= args.e_ksize, stride=2, padding=1, 
@@ -76,14 +78,15 @@ class Encoder(nn.Module):
             enet.load_model('autoencoder.pth.tar')
             # Here [enet] should be loaded with weights from file 'autoencoder.pth.tar'
         """
-#         summary = torch.load(filename)
-#         summary['encoder']
-        raise NotImplementedError()
-
+        
+        summary = torch.load(filename)
+        encoder = Encoder(self.args)
+        encoder.load_state_dict(summary['encoder'])        
 
 class Decoder(nn.Module):
     def __init__(self, args):
         super(Decoder, self).__init__()
+        self.args = args
         
         self.relu = nn.ReLU()
         self.proj = nn.Linear(args.nz, args.ngf*4*4*4)
@@ -127,7 +130,9 @@ class Decoder(nn.Module):
             dnet.load_model('autoencoder.pth.tar')
             # Here [dnet] should be loaded with weights from file 'autoencoder.pth.tar'
         """
-        raise NotImplementedError()
+        summary = torch.load(filename)
+        decoder = Decoder(self.args)
+        decoder.load_state_dict(summary['decoder'])  
 
 
 def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=None):
