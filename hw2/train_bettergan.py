@@ -139,7 +139,7 @@ def d_loss(dreal, dfake):
     real_target = torch.ones(dreal.shape[0]).float()
     fake_target = torch.zeros(dfake.shape[0]).float()
     
-    if dreal.is_cuda or dfake.is_cuda():
+    if dreal.is_cuda or dfake.is_cuda:
         real_target = real_target.cuda()
         fake_target = fake_target.cuda()
     
