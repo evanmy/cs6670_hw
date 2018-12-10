@@ -149,7 +149,7 @@ def d_loss(dreal, dfake):
     
     return F.binary_cross_entropy(pred, target)
 
-def grd_loss(inputs, discriminator, c=40, lmbd=10, k=1):
+def grd_loss(inputs, discriminator, c=8, lmbd=0.8, k=1):
     noise = torch.abs(torch.randn(inputs.shape)/c).float()
     
     if inputs.is_cuda:  
@@ -168,30 +168,6 @@ def grd_loss(inputs, discriminator, c=40, lmbd=10, k=1):
     norm = grad.norm(2, dim=1)
 
     return lmbd*((norm-k)**2).mean()
-
-# def compute_gradient_penalty(D, X):
-#     Tensor = torch.cuda.FloatTensor if X.is_cuda else torch.FloatTensor
-#     from torch.autograd import Variable
-    
-#     """Calculates the gradient penalty loss for DRAGAN"""
-#     # Random weight term for interpolation
-#     alpha = Tensor(np.random.random(size=X.shape))
-
-#     interpolates =  alpha * X + ((1 - alpha) * (X + 0.5 * X.std() * torch.rand(X.size()).cuda()))
-#     interpolates = Variable(interpolates, requires_grad=True)
-
-#     d_interpolates = D(interpolates)
-
-#     fake = torch.ones(d_interpolates.size()).cuda() 
-
-#     # Get gradient w.r.t. interpolates
-#     gradients = torch.autograd.grad(outputs=d_interpolates, inputs=interpolates,
-#                               grad_outputs=fake, create_graph=True, retain_graph=True,
-#                               only_inputs=True)[0]
-
-#     gradient_penalty = 10 * ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-#     return gradient_penalty
-
 
 def g_loss(dreal, dfake):
     """
@@ -256,8 +232,7 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     dfake = d_net(fake.detach())
     dreal = d_net(inputs)
     L_d = d_loss(dreal, dfake)
-    L_grd = grd_loss(inputs, d_net, c=40, lmbd=10, k=1)
-#     L_grd = compute_gradient_penalty(d_net, inputs)
+    L_grd = grd_loss(inputs, d_net, c=8, lmbd=0.8, k=1)
     L_t = L_grd + L_d
     L_t.backward()
     d_opt.step()
@@ -328,4 +303,6 @@ if __name__ == "__main__":
     })
 
     gen_img = sample(g_net, 50000, get_z, args)
+    
+    #gen_img = gen_img[:,:,:,:]*(gen_img[:,:,:,:]>0.005)
     np.save('mygan_out.npy', gen_img)
