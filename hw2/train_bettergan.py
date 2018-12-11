@@ -271,15 +271,24 @@ if __name__ == "__main__":
 
     d_net = Discriminator(args)
     g_net = Generator(args)
+        
     if args.cuda:
         d_net = d_net.cuda()
         g_net = g_net.cuda()
-
+    
     d_opt = torch.optim.Adam(
             d_net.parameters(), lr=args.lr_d, betas=(args.beta_1, args.beta_2))
     g_opt = torch.optim.Adam(
             g_net.parameters(), lr=args.lr_g, betas=(args.beta_1, args.beta_2))
 
+    if args.resume is not None:
+        summary = torch.load(args.resume)
+        d_net.load_state_dict(summary['dnet'])     
+        g_net.load_state_dict(summary['gnet'])     
+        d_opt.load_state_dict(summary['dopt'])     
+        g_opt.load_state_dict(summary['gopt'])
+        print('Model Loaded')
+        
     def get_z():
         z = torch.rand(args.batch_size, args.nz)
         if args.cuda:
